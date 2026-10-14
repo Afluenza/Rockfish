@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Rockfish",
+  "version": "1.0.0",
+  "description": "Reads the position on chess.com and lichess and shows the top 3 engine moves. Runs Stockfish locally.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.chess.com/*",
+    "https://lichess.org/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.chess.com/*",
+        "https://lichess.org/*"
+      ],
+      "js": [
+        "src/selectors.js",
+        "src/content.js",
+        "src/overlay.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "action": {
+    "default_title": "Rockfish"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "popup.html"
+      ],
+      "matches": [
+        "https://www.chess.com/*",
+        "https://lichess.org/*"
+      ]
+    }
+  ],
+  "icons": {
+    "128": "assets/king.png"
+  }
+}
