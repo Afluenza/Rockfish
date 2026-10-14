@@ -15,9 +15,11 @@ Rockfish reads the position on a chess.com or lichess.org board and shows the to
 
 ## Install & Use
 
-https://github.com/user-attachments/assets/593d3d3f-06ec-4c49-a850-46d09e57ad31
 
-**Must be used in a live game.**
+https://github.com/user-attachments/assets/babd1f83-0a42-424b-95a0-cfe674849dc2
+
+### Must be used in a live game.
+
 
 ### Other ways to use it
 
