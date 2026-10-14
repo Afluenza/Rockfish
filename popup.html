@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Rockfish</title>
+  <style>
+    /* Apple-style palette: dark by default, light when the system is set to light. */
+    :root {
+      color-scheme: dark light;
+      --bg: #1c1c1e;
+      --card: #2c2c2e;
+      --card-2: #3a3a3c;
+      --text: #f5f5f7;
+      --muted: #98989d;
+      --sep: #3a3a3c;
+      --accent: #0a84ff;
+      --btn: #3a3a3c;
+      --btn-hover: #48484a;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f5f5f7;
+        --card: #ffffff;
+        --card-2: #e5e5ea;
+        --text: #1d1d1f;
+        --muted: #6e6e73;
+        --sep: #d1d1d6;
+        --accent: #007aff;
+        --btn: #e5e5ea;
+        --btn-hover: #d8d8dc;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      width: 100%;
+      min-width: 300px;
+      margin: 0;
+      padding: 14px;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .logo { width: 30px; height: 30px; vertical-align: middle; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+    h1 { display: flex; align-items: center; gap: 8px; }
+    .head { position: relative; padding: 6px 8px; border-radius: 12px;
+      background: radial-gradient(circle at 12% 50%, rgba(255,214,10,.14), transparent 60%); }
+    .head::after { content: ""; position: absolute; right: -4px; top: -10px; width: 74px; height: 74px; z-index: 0;
+      background: url(assets/king.png) center / contain no-repeat; opacity: .12; pointer-events: none; transform: rotate(12deg); }
+    .head > * { position: relative; z-index: 1; }
+    .ghost { width: 100%; margin-top: 6px; }
+    .head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    h1 { font-size: 15px; font-weight: 600; margin: 0; }
+
+    /* Side switch: the track is white for White and black for Black. */
+    .side { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .switch { position: relative; display: inline-block; width: 58px; height: 32px; cursor: pointer; }
+    .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .track {
+      position: absolute; inset: 0; border-radius: 16px;
+      background: #f5f5f7; border: 1px solid var(--sep);
+      transition: background 0.2s ease;
+    }
+    .knob {
+      position: absolute; top: 2px; left: 2px; width: 28px; height: 28px; border-radius: 50%;
+      background: #f5f5f7 url(assets/king.png) center / 86% no-repeat; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .switch input:checked + .track { background: #000000; }
+    .switch input:checked + .track .knob { transform: translateX(26px); background-color: #2c2c2e; }
+    .switch input:checked + .track .knob { filter: brightness(.35) contrast(1.4); }
+    .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .switch input:disabled { cursor: default; }
+    .switch input:disabled + .track { opacity: 0.5; }
+
+    button {
+      font: inherit; font-size: 12px; color: var(--text); background: var(--btn);
+      border: none; border-radius: 8px; padding: 7px 12px; cursor: pointer;
+    }
+    button:hover { background: var(--btn-hover); }
+    button:disabled { cursor: default; opacity: 0.5; }
+    .primary { width: 100%; background: var(--accent); color: #ffffff; font-weight: 600; }
+    .primary:hover { background: var(--accent); filter: brightness(1.1); }
+
+    .board-row { display: flex; gap: 8px; align-items: stretch; justify-content: center; margin-top: 12px; }
+    #board { width: 320px; height: 320px; border-radius: 6px; overflow: hidden; }
+    #board svg { width: 100%; height: 100%; display: block; }
+    /* Eval bar: White's share of the win chance, White at the bottom. */
+    #eval { width: 14px; height: 320px; border-radius: 4px; overflow: hidden; background: #000000; display: flex; flex-direction: column-reverse; }
+    #eval-bar { width: 100%; background: #f5f5f7; height: 50%; transition: height 0.3s ease; }
+    #eval-bar[data-empty="1"] { background: var(--muted); }
+    #board:empty::before {
+      content: "Read the board or paste a FEN to see it here.";
+      display: block; color: var(--muted); font-size: 12px; padding-top: 140px; text-align: center;
+    }
+
+    #status { margin-top: 10px; min-height: 1.4em; color: var(--muted); font-size: 12px; }
+    #status.error { color: #ff453a; }
+
+    /* Engine lines: chess.com-style rows under the board. */
+    .lines-title { font-size: 12px; color: var(--muted); margin: 10px 0 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+    li.line {
+      display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 4px 10px;
+      background: var(--card); border-radius: 10px; padding: 9px 10px;
+      border-left: 3px solid var(--c);
+    }
+    .rank { grid-row: span 2; width: 22px; height: 22px; border-radius: 50%; background: var(--c); color: #000000; font-weight: 700; font-size: 12px; text-align: center; line-height: 22px; }
+    .move { font-weight: 600; font-variant-numeric: tabular-nums; font-size: 14px; }
+    .eval { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 12px; padding: 3px 8px; border-radius: 6px; }
+    .eval.white { background: #f5f5f7; color: #1c1c1e; }
+    .eval.black { background: #000000; color: #f5f5f7; border: 1px solid #48484a; }
+    .pv { grid-column: 2 / 4; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .empty { color: var(--muted); font-size: 12px; padding: 6px 0; }
+
+    /* Advanced: FEN fields, collapsed by default. */
+    details { margin-top: 14px; border-top: 1px solid var(--sep); padding-top: 10px; }
+    summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 600; font-size: 12px; user-select: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary svg { width: 14px; height: 14px; }
+    details[open] summary { color: var(--text); }
+    .adv { margin-top: 10px; display: grid; gap: 6px; }
+    .adv label { color: var(--muted); font-size: 11px; font-weight: 600; margin-top: 4px; }
+    input[type="text"] {
+      width: 100%; font: 11px ui-monospace, Menlo, monospace; padding: 7px 8px;
+      border-radius: 8px; border: 1px solid var(--sep); background: var(--card); color: var(--text);
+    }
+    .row { display: flex; gap: 8px; }
+    #assumed { color: var(--muted); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <h1><img class="logo" src="assets/king.png" alt=""> Rockfish</h1>
+    <div class="side">
+      <span id="side-label">White</span>
+      <label class="switch" title="Which side you play">
+        <input id="side-toggle" type="checkbox" role="switch" aria-label="Play as Black">
+        <span class="track"><span class="knob"></span></span>
+      </label>
+    </div>
+  </div>
+
+  <button id="read" class="primary">Scan</button>
+  <button id="float" class="ghost" title="Show the helper on top of the chess page">Float on page (stays on top)</button>
+
+  <div class="board-row">
+    <div id="board" aria-live="polite"></div>
+    <div id="eval" title="White's win chance"><div id="eval-bar" data-empty="1"></div></div>
+  </div>
+
+  <div id="status" role="status" aria-live="polite"></div>
+
+  <div class="lines-title">Top 3 moves</div>
+  <ol id="moves"></ol>
+
+  <details>
+    <summary>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <circle cx="12" cy="12" r="8" stroke-width="4" stroke-dasharray="2.2 2.4"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      Advanced
+    </summary>
+    <div class="adv">
+      <label for="fen-paste">Paste a FEN (fallback)</label>
+      <div class="row">
+        <input id="fen-paste" type="text" spellcheck="false" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">
+        <button id="analyse-fen">Analyse</button>
+      </div>
+
+      <label for="fen-out">Current FEN</label>
+      <input id="fen-out" type="text" readonly spellcheck="false" placeholder="none yet">
+      <div id="assumed"></div>
+    </div>
+  </details>
+
+  <script type="module" src="src/popup.js"></script>
+</body>
+</html>
