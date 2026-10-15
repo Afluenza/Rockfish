@@ -2,6 +2,7 @@
 // On a chess.com or lichess.org tab it floats a panel on top of the page (this is the "stay on top" mode:
 // a browser extension window cannot be forced above the browser, a panel inside the page can).
 // Elsewhere it uses the side panel if the browser has one, else a small separate window.
+// It also relays engine traffic: each popup/overlay port is paired with a port to the offscreen document, which runs the Worker.
 
 const SITE = /^https:\/\/(www\.chess\.com|lichess\.org)\//;
 const TOGGLE = 'chess-helper:toggle-overlay';
@@ -53,6 +54,45 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     sendResponse({ ok: !!tab && (await toggleOverlay(tab)) });
   });
   return true;
+});
+
+// Creates the offscreen document once. Two popups may ask at the same moment, so a failed create is accepted if one now exists.
+async function ensureOffscreen() {
+  if (await chrome.offscreen.hasDocument()) return;
+  try {
+    await chrome.offscreen.createDocument({
+      url: 'src/offscreen.html',
+      reasons: ['WORKERS'],
+      justification: 'Run the Stockfish engine Worker for chess analysis'
+    });
+  } catch (err) {
+    if (!(await chrome.offscreen.hasDocument())) throw err;
+  }
+}
+
+// Each popup/overlay connection gets its own port to the offscreen document. Messages wait until that port is ready.
+chrome.runtime.onConnect.addListener((popupPort) => {
+  if (popupPort.name !== 'rockfish-engine') return;
+  const offscreenPort = ensureOffscreen().then(() => {
+    const port = chrome.runtime.connect({ name: 'rockfish-offscreen' });
+    port.onMessage.addListener((msg) => {
+      try { popupPort.postMessage(msg); } catch { /* popup closed */ }
+    });
+    port.onDisconnect.addListener(() => {
+      try { popupPort.postMessage({ error: 'engine stopped' }); } catch { /* popup closed */ }
+    });
+    return port;
+  });
+  offscreenPort.catch((err) => {
+    console.error('Chess Helper: offscreen engine failed to start', err);
+    try { popupPort.postMessage({ error: `offscreen engine failed to start: ${err.message}` }); } catch { /* popup closed */ }
+  });
+  popupPort.onMessage.addListener((msg) => {
+    offscreenPort.then((port) => port.postMessage(msg)).catch(() => {});
+  });
+  popupPort.onDisconnect.addListener(() => {
+    offscreenPort.then((port) => port.disconnect()).catch(() => {});
+  });
 });
 
 chrome.action.onClicked.addListener(openUi);
