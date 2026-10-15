@@ -36,13 +36,33 @@ export function parseInfo(line) {
   return out;
 }
 
-// Transport for a browser Worker. The Stockfish worker build takes command strings and posts back output lines.
-export function createWorkerTransport(url) {
+// Browser transport used by the popup and overlay. The Stockfish Worker does not run in the page-embedded
+// popup iframe (Chrome fails to load it there, "engine worker failed to load"). It runs in the offscreen
+// document instead (src/offscreen.js), reached through background.js over a port. The url argument is unused.
+export function createWorkerTransport() {
+  const port = chrome.runtime.connect({ name: 'rockfish-engine' });
+  let onLine = () => {};
+  let onError = () => {};
+  port.onMessage.addListener((msg) => {
+    if (msg.line !== undefined) onLine(String(msg.line));
+    else if (msg.error !== undefined) onError(String(msg.error));
+  });
+  port.onDisconnect.addListener(() => onError('engine connection lost'));
+  return {
+    send: (cmd) => port.postMessage({ cmd }),
+    setListener: (fn) => { onLine = fn; },
+    setErrorListener: (fn) => { onError = fn; },
+    close: () => port.disconnect(),
+  };
+}
+
+// Worker transport for the offscreen document only: wraps the Stockfish Worker at url.
+// A worker that fails to load or throws fires onerror, not onmessage. Report it so the engine call fails fast.
+export function createLocalWorkerTransport(url) {
   const worker = new Worker(url);
   let onLine = () => {};
   let onError = () => {};
   worker.onmessage = (e) => onLine(String(e.data));
-  // A worker that fails to load or throws fires onerror, not onmessage. Report it so the engine call fails fast.
   worker.onerror = (e) => onError(e.message || `engine worker failed to load from ${url}`);
   return {
     send: (cmd) => worker.postMessage(cmd),
