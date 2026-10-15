@@ -5,6 +5,8 @@ import { createLocalWorkerTransport, ENGINE_JS } from '../engine/uci-engine.js';
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'rockfish-offscreen') return;
+  // Tell background.js this document is listening. It retries the connection until this arrives.
+  port.postMessage({ ready: true });
   const transport = createLocalWorkerTransport(chrome.runtime.getURL(`engine/${ENGINE_JS}`));
   transport.setListener((line) => port.postMessage({ line }));
   transport.setErrorListener((error) => port.postMessage({ error }));
