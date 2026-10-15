@@ -2,7 +2,7 @@
 
 Rockfish reads the position on a chess.com or lichess.org board and shows the top 3 engine moves as arrows, plus the opponent's biggest threat and an eval bar. The engine (Stockfish, WASM) runs locally inside the extension. Nothing is sent to a server.
 
-> **Warning: read before use.** Using an engine helper during games can break chess.com's fair-play rules. Consistent use may get your account banned. **Use Rockfish only in situations of struggle**.
+> **Use Rockfish only in situations of struggle**.
 >
 > **The author is not at fault or responsible for any bans, account actions or other consequences of using this extension.** You use it entirely at your own risk.
 
