@@ -43,7 +43,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "popup.html"
+        "popup.html",
+        "engine/*"
       ],
       "matches": [
         "https://www.chess.com/*",
