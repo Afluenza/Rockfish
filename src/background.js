@@ -70,12 +70,38 @@ async function ensureOffscreen() {
   }
 }
 
+// Connects to the offscreen document. Right after it is created its script may not be listening yet,
+// so a connection that drops before the document answers { ready: true } is retried.
+async function connectOffscreen() {
+  await ensureOffscreen();
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const port = chrome.runtime.connect({ name: 'rockfish-offscreen' });
+    const ready = await new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), 1500);
+      port.onMessage.addListener(function onFirst(msg) {
+        if (!msg || !msg.ready) return;
+        port.onMessage.removeListener(onFirst);
+        clearTimeout(timer);
+        resolve(true);
+      });
+      port.onDisconnect.addListener(() => {
+        clearTimeout(timer);
+        resolve(false);
+      });
+    });
+    if (ready) return port;
+    port.disconnect();
+    await new Promise((r) => setTimeout(r, 300 * attempt));
+  }
+  throw new Error('offscreen engine did not answer after 5 tries');
+}
+
 // Each popup/overlay connection gets its own port to the offscreen document. Messages wait until that port is ready.
 chrome.runtime.onConnect.addListener((popupPort) => {
   if (popupPort.name !== 'rockfish-engine') return;
-  const offscreenPort = ensureOffscreen().then(() => {
-    const port = chrome.runtime.connect({ name: 'rockfish-offscreen' });
+  const offscreenPort = connectOffscreen().then((port) => {
     port.onMessage.addListener((msg) => {
+      if (msg.ready) return;
       try { popupPort.postMessage(msg); } catch { /* popup closed */ }
     });
     port.onDisconnect.addListener(() => {
